@@ -34,7 +34,7 @@
           </descriptorRefs>
           <archive>
             <manifest>
-              <mainClass>tracer.MyTracer</mainClass>
+              <mainClass>htrace.example.local.LocalHTracer</mainClass>
             </manifest>
           </archive>
         </configuration>
