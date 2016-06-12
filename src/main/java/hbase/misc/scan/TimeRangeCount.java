@@ -16,7 +16,7 @@ import java.text.SimpleDateFormat;
 /**
  * Created by Fasten on 2016/6/12.
  *
- * Temporary get row count between time range
+ * Temporary get row count(Only for one column family) between time range
  * The better way is create an endpoint in server-side.
  *
  * java -Djava.library.path=$HADOOP_HOME/lib/native ScanTimeRange <tableName> <startDay> <endDay>
