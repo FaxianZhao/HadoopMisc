@@ -16,8 +16,8 @@ import java.text.SimpleDateFormat;
 /**
  * Created by Fasten on 2016/6/12.
  *
- * Temporary get row count(Only for one column family) between time range
- * The better way is create an endpoint in server-side.
+ * Temporary get row count between time range
+ * The better way is create an Observer.
  *
  * java -Djava.library.path=$HADOOP_HOME/lib/native ScanTimeRange <tableName> <startDay> <endDay>
  */
@@ -32,7 +32,8 @@ public class TimeRangeCount {
             Scan scan = new Scan();
             scan.setScanMetricsEnabled(true);
             scan.setTimeRange(df.parse(args[1]).getTime(), df.parse(args[2]).getTime());
-            Filter filter = new KeyOnlyFilter();
+            // If constructor with true, it will return real value length
+            Filter filter = new KeyOnlyFilter(false);
             scan.setFilter(filter);
             ResultScanner resultScanner = table.getScanner(scan);
             int count = 0;
