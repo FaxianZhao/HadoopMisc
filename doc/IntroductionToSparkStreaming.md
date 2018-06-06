@@ -1,6 +1,7 @@
 #Spark Streaming是如何提交任务的？
 Spark Streaming是现在实时消息处理的解决方案之一，本文是简单介绍一下Spark Streaming的任务是如何提交的。
 默认读者知道什么是RDD,以及SparkContext是如何提交RDD任务的。
+Spark版本2.2.x
 
 ##Spark Streaming Example
 首先，我们先看一个Spark Streaming程序的例子(取自Spark Streaming Example,删除了部分无关代码和注释)
