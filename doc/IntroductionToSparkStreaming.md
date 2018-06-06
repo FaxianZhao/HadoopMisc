@@ -1,7 +1,8 @@
-Spark Streaming是现在实时消息处理的解决方案之一，本文是简单介绍一下Spark Streaming的任务是如何执行的。
+#Spark Streaming是如何提交任务的？
+Spark Streaming是现在实时消息处理的解决方案之一，本文是简单介绍一下Spark Streaming的任务是如何提交的。
 默认读者知道什么是RDD,以及SparkContext是如何提交RDD任务的。
 
-
+##Spark Streaming Example
 首先，我们先看一个Spark Streaming程序的例子(取自Spark Streaming Example,删除了部分无关代码和注释)
 ```scala
 object NetworkWordCount {
@@ -23,31 +24,38 @@ object NetworkWordCount {
   }
 }
 ```
-我们可以看到，整个Spark Streaming的入口是StreamingContext这个类。
+##Streaming Context
+通过例子，我们可以看到，整个Spark Streaming的入口是StreamingContext这个类。
 下图为StreamingContext这个类中比较重要的两个对象。   
-![StreamingContext](sparkStreaming/StreamingContext.png)
+![StreamingContext](sparkStreaming/StreamingContext.png)  
 
-其中，DStreamGraph会持有该StreamingContext的所有输入流，以及输出流。
+DStreamGraph会持有该StreamingContext的所有输入流，以及输出流。
 JobScheduler则分别通过ReceiverTracker来管理所有的Receiver以及处理Receiver接收的数据；
-通过JobGenerator定时生成每个批次的RDD任务，提交给Executor执行。
+通过JobGenerator定时生成每个批次的RDD任务，提交给Executor执行。  
+ 
+这里我们看一下DStreamGraph这个类，通过它引入了几个新的类DStream, InputDStream, Receiver。 
+##DStream  
+DStream是Spark对RDD在时间维度上的一个封装，代表了一个RDD的流。  
+(个人理解是为了在Spark工作栈方面的统一，但也正因为这个问题，Spark Streaming暂时不支持实时消息处理)  
+如果Spark Core的处理方式是RDD组成的DAG, 那么Spark Streaming就是DStream组成的DAG(Streaming中没有明确的DAG概念)。  
+![DStream](sparkStreaming/DStream.png)    
+DStream的dependencies对象的作用和RDD的deps类似，都是为了把这个图描述出来。  
+DStream的generatedRDDs对象是用于保存时间戳和RDD的映射关系，也就是上面提到的DStream是一个RDD的流。  
+这个时间戳就和我们初始化StreamingContext时的batchDuration参数有关。而对应的RDD可以理解为这段时间内的数据。  
+其实我们对Streaming的操作最后都会映射到对这个对应的RDD进行操作。  
 
-这里我们引入了几个新的类DStream, InputDStream, Receiver。
-![StreamingContext](sparkStreaming/DStream.png)  
-DStream是Spark对RDD在时间维度上的一个封装，代表了一个RDD的流。
-(主要是为了在Spark工作栈方面的统一，但也正因为这个问题，Spark Streaming暂时不支持实时消息处理)
-如果Spark Core的处理方式是RDD组成的DAG, 那么Spark Streaming就是DStream组成的DAG(Streaming中没有明确的DAG概念)。
-DStream的dependencies对象的作用和RDD的deps类似，都是为了把这个图描述出来。
-DStream的generatedRDDs对象是用于保存时间戳和RDD的映射关系，也就是上面提到的DStream是一个RDD的流。
-这个时间戳就和我们初始化StreamingContext时的batchDuration参数有关。而对应的RDD可以理解为这段时间内的数据。
-其实我们对Streaming的操作最后都会映射到对这个对应的RDD进行操作。
-插句题外话，我们去翻看WindowedDStream的compute方法的话，会发现他是对一段时间内的RDD做了一个union操作,把它们当做同一个RDD来看待。
+插句题外话，我们去翻看WindowedDStream的compute()方法的话，会发现它是对一段时间内的RDD做了一个union操作,把它们当做同一个RDD来看待。  
 
-那么，相对于RDD具备transform和action, DStream呢？
-DStream有一种叫output operator的操作，核心是调用了foreachRDD()这个方法。(print, saveAsxxx也都是间接使用了这个方法)
-而在foreachRDD()起到关键性作用的就是，它会调用register()方法(当然先转化为ForEachDStream)，这个方法会把我们最终的DStream加入到StreamingContext对象
-的graph(DStreamGraph)的outputStreams中。这样，我们一个Stream的图(类似于RDD的DAG)就组装完成了。
+##Output Operator
+对于RDD具备transform和action两类操作, DStream呢？
+DStream有一种叫output operator的操作，核心是调用了foreachRDD()这个方法。(print, saveAsxxx也都是间接使用了这个方法)  
+而在foreachRDD()起到关键性作用的就是，它会调用register()方法(当然先转化为ForEachDStream)，**这个方法会把我们最终的DStream加入到StreamingContext对象
+的graph(DStreamGraph)的outputStreams中**。这样，我们一个Stream的图(类似于RDD的DAG)就组装完成了。  
 
-拼图的工作暂时告一段落。我们来看一下DStream的子类，一部分是通过内部操作生成的子类例如MappedDStream，FilteredDStream等，另一部分是
+拼图的工作暂时告一段落。  
+
+##DStream的子类们
+我们来看一下DStream的子类，一部分是通过内部操作生成的子类例如MappedDStream，FilteredDStream等，另一部分是
 InputDStream也就是我们所处理的数据的数据源的抽象类。
 ```scala
 abstract class InputDStream[T: ClassTag](_ssc: StreamingContext)
@@ -62,36 +70,38 @@ abstract class InputDStream[T: ClassTag](_ssc: StreamingContext)
 1. 类对象初始化时，会自动把该对象加入到StreamingContext对象的graph(DStreamGraph)的inputStreams中。
 2. 每个对象都有从StreamingContext拿到的唯一id。
 
-关于InputDStream的子类又分为两种：
-从Driver端接收数据的话，直接继承InputDStream即可。
-需要分布式接收数据的话，则需要继承InputDStream的子类ReceiverInputDStream。
+关于InputDStream的子类又分为两种：  
+* 从Driver端接收数据的话，直接继承InputDStream即可。
+* 需要分布式接收数据的话，则需要继承InputDStream的子类ReceiverInputDStream。
 
-Driver端接收数据的方式我们这次不研究。主要看ReceiverInputDStream。
-有些同学可能已经猜到，Spark Streaming是对不同数据源进行Receiver类的具体实现、ReceiverInputDStream类的具体实现来统一接收数据的。
+Driver端接收数据的方式我们这次不研究。主要看ReceiverInputDStream。  
+有些同学可能已经猜到，Spark Streaming想接收不同的数据源，只需要分别实现Receiver类、ReceiverInputDStream类即可。  
 
 这里，对于不同数据源的不同实现我们不做解读。我们主要来看一下这些Receiver都是怎么运作的。
 
-退回到最初的例子。
+##StreamingContext的具体执行逻辑
+退回到最初的例子，我们的代码中有如下步骤。
 1. 初始化StreamingContext
 2. 从StreamingContenxt拿到ReceiverInputDStream的子类SocketInputDStream
-3. 进过各种DStream的转化，最终调用print()方法（内部调用foreachRDD()），把最终的ForEachDStream，并把该DStream加入到graph的outputStreams中。
+3. 进过各种DStream的转化，最终调用print()方法（内部调用foreachRDD()），把最终的ForEachDStream加入到graph的outputStreams中。
 4. 调用StreamingContext的start()方法，触发整个逻辑的执行。
 
 那么在StreamingContext的start()方法做了什么呢？
-主要逻辑在一个叫streaming-start的线程中，只有一行代码
+主要逻辑在一个叫streaming-start的线程中，核心逻辑只有一行代码
 ```scala
 scheduler.start()
 ```  
 这个对象在我们第一个图里是有体现的。类型是JobScheduler。
+###JobScheduler.start()
 我们进入JobScheduler的start()方法看一下。
-有以下几个动作：
+有以下几个主要动作：
 1. 初始化内部消息队列eventLoop
-2. 初始化并启动receiverTracker
-3. 启动jobGenerator
+2. **初始化并启动receiverTracker**
+3. **启动jobGenerator**
 4. 初始化并启动executorAllocationManager
 
 我们重点关注一下在第一个图中有体现的receiverTracker和jobGenerator
-
+###ReceiverTracker.start()
 ReceiverTracker的start()方法
 1. 注册一个RPC endpoint对象用于RPC通信
 2. 调用launchReceivers()方法
@@ -115,7 +125,6 @@ private def launchReceivers(): Unit = {
   }
 
 ```
-
 
 StartAllReceivers消息传到哪了？怎么处理？
 翻到ReceiverTrackerEndpoint的receive()方法
@@ -181,11 +190,11 @@ private def startReceiver(
 ReceiverSupervisorImpl具体内容，我们因为篇幅有限，暂不扩展。有兴趣的同学可以自己去研究。
 主要是怎么定时把接收到的数据存为Spark的Block，并告知blockManager。当然还有WAL的逻辑。
 
-所以为什么我们要在申请资源的时候，给receiver预留资源。
+所以为什么我们要在提交Streaming任务申请资源的时候，给receiver预留资源。
 这里我们就找到了答案：receiver其实是被当做rdd的job发到executor去执行的。
 
 到这里，我们的ReceiverTracker也就告一段落了。
-
+###JobGenerator.start()
 接下来是jobGenerator
 JobGenerator的start()方法
 1. 初始化内部消息队列eventLoop
@@ -228,7 +237,7 @@ private val timer = new RecurringTimer(clock, ssc.graph.batchDuration.millisecon
 这里会把任务封装为JobSet,然后调用jobScheduler.submitJobSet()方法。我们看一下这个方法的核心调用
 ```scala
 def submitJobSet(jobSet: JobSet) {
-    // jobExecutor是一个线程池，pool的大小通过spark.streaming.concurrentJobs确定，默认为1
+    // jobExecutor是一个线程池，pool的大小通过spark.streaming.concurrentJobs配置，默认为1
     jobSet.jobs.foreach(job => jobExecutor.execute(new JobHandler(job)))
   }
 ```
@@ -330,6 +339,7 @@ def print(num: Int): Unit = ssc.withScope {
 所以我们的DStream中的output operator是会转化为RDD任务提交到集群处理。
 
 这里，我们的主要流程就走完了。
-回顾主要两点内容：
+##总结：
+主要是两点内容：
 1. Receiver会作为RDD任务提交到集群执行。
 2. DStream最终的执行形式也是转化为RDD任务进行提交。
