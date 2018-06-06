@@ -1,9 +1,9 @@
-#Spark Streaming是如何提交任务的？
+# Spark Streaming是如何提交任务的？  
 Spark Streaming是现在实时消息处理的解决方案之一，本文是简单介绍一下Spark Streaming的任务是如何提交的。
 默认读者知道什么是RDD,以及SparkContext是如何提交RDD任务的。
 Spark版本2.2.x
 
-##Spark Streaming Example
+## Spark Streaming Example
 首先，我们先看一个Spark Streaming程序的例子(取自Spark Streaming Example,删除了部分无关代码和注释)
 ```scala
 object NetworkWordCount {
@@ -25,7 +25,7 @@ object NetworkWordCount {
   }
 }
 ```
-##Streaming Context
+## Streaming Context
 通过例子，我们可以看到，整个Spark Streaming的入口是StreamingContext这个类。
 下图为StreamingContext这个类中比较重要的两个对象。   
 ![StreamingContext](sparkStreaming/StreamingContext.png)  
@@ -35,7 +35,7 @@ JobScheduler则分别通过ReceiverTracker来管理所有的Receiver以及处理
 通过JobGenerator定时生成每个批次的RDD任务，提交给Executor执行。  
  
 这里我们看一下DStreamGraph这个类，通过它引入了几个新的类DStream, InputDStream, Receiver。 
-##DStream  
+## DStream  
 DStream是Spark对RDD在时间维度上的一个封装，代表了一个RDD的流。  
 (个人理解是为了在Spark工作栈方面的统一，但也正因为这个问题，Spark Streaming暂时不支持实时消息处理)  
 如果Spark Core的处理方式是RDD组成的DAG, 那么Spark Streaming就是DStream组成的DAG(Streaming中没有明确的DAG概念)。  
@@ -47,7 +47,7 @@ DStream的generatedRDDs对象是用于保存时间戳和RDD的映射关系，也
 
 插句题外话，我们去翻看WindowedDStream的compute()方法的话，会发现它是对一段时间内的RDD做了一个union操作,把它们当做同一个RDD来看待。  
 
-##Output Operator
+## Output Operator
 对于RDD具备transform和action两类操作, DStream呢？
 DStream有一种叫output operator的操作，核心是调用了foreachRDD()这个方法。(print, saveAsxxx也都是间接使用了这个方法)  
 而在foreachRDD()起到关键性作用的就是，它会调用register()方法(当然先转化为ForEachDStream)，**这个方法会把我们最终的DStream加入到StreamingContext对象
@@ -55,7 +55,7 @@ DStream有一种叫output operator的操作，核心是调用了foreachRDD()这�
 
 拼图的工作暂时告一段落。  
 
-##DStream的子类们
+## DStream的子类们
 我们来看一下DStream的子类，一部分是通过内部操作生成的子类例如MappedDStream，FilteredDStream等，另一部分是
 InputDStream也就是我们所处理的数据的数据源的抽象类。
 ```scala
@@ -80,7 +80,7 @@ Driver端接收数据的方式我们这次不研究。主要看ReceiverInputDStr
 
 这里，对于不同数据源的不同实现我们不做解读。我们主要来看一下这些Receiver都是怎么运作的。
 
-##StreamingContext的具体执行逻辑
+## StreamingContext的具体执行逻辑
 退回到最初的例子，我们的代码中有如下步骤。
 1. 初始化StreamingContext
 2. 从StreamingContenxt拿到ReceiverInputDStream的子类SocketInputDStream
@@ -93,7 +93,7 @@ Driver端接收数据的方式我们这次不研究。主要看ReceiverInputDStr
 scheduler.start()
 ```  
 这个对象在我们第一个图里是有体现的。类型是JobScheduler。
-###JobScheduler.start()
+### JobScheduler.start()
 我们进入JobScheduler的start()方法看一下。
 有以下几个主要动作：
 1. 初始化内部消息队列eventLoop
@@ -102,7 +102,7 @@ scheduler.start()
 4. 初始化并启动executorAllocationManager
 
 我们重点关注一下在第一个图中有体现的receiverTracker和jobGenerator
-###ReceiverTracker.start()
+### ReceiverTracker.start()
 ReceiverTracker的start()方法
 1. 注册一个RPC endpoint对象用于RPC通信
 2. 调用launchReceivers()方法
@@ -195,7 +195,7 @@ ReceiverSupervisorImpl具体内容，我们因为篇幅有限，暂不扩展。�
 这里我们就找到了答案：receiver其实是被当做rdd的job发到executor去执行的。
 
 到这里，我们的ReceiverTracker也就告一段落了。
-###JobGenerator.start()
+### JobGenerator.start()
 接下来是jobGenerator
 JobGenerator的start()方法
 1. 初始化内部消息队列eventLoop
@@ -340,7 +340,7 @@ def print(num: Int): Unit = ssc.withScope {
 所以我们的DStream中的output operator是会转化为RDD任务提交到集群处理。
 
 这里，我们的主要流程就走完了。
-##总结：
+## 总结：
 主要是两点内容：
 1. Receiver会作为RDD任务提交到集群执行。
 2. DStream最终的执行形式也是转化为RDD任务进行提交。
