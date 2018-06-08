@@ -159,7 +159,7 @@ private def startReceiver(
         receiver: Receiver[_],
         scheduledLocations: Seq[TaskLocation]): Unit = {
       
-      // 我们自己构造一个RDD,内容是receiver和执行的executor的对应关系
+      // 我们自己构造一个RDD,这个makeRDD方法可以把数据生成到指定的location。
       val receiverRDD: RDD[Receiver[_]] ={
           val preferredLocations = scheduledLocations.map(_.toString).distinct
           ssc.sc.makeRDD(Seq(receiver -> preferredLocations))
