@@ -84,7 +84,7 @@ Driver端接收数据的方式我们这次不研究。主要看ReceiverInputDStr
 退回到最初的例子，我们的代码中有如下步骤。
 1. 初始化StreamingContext
 2. 从StreamingContenxt拿到ReceiverInputDStream的子类SocketInputDStream
-3. 进过各种DStream的转化，最终调用print()方法（内部调用foreachRDD()），把最终的ForEachDStream加入到graph的outputStreams中。
+3. 经过各种DStream的转化，最终调用print()方法（内部调用foreachRDD()），把最终的ForEachDStream加入到graph的outputStreams中(register()方法)。
 4. 调用StreamingContext的start()方法，触发整个逻辑的执行。
 
 那么在StreamingContext的start()方法做了什么呢？
